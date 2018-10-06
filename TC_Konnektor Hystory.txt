@@ -1,0 +1,52 @@
+===================================
+2018-10-03 Verzia suboru v0.1.30.25
+===================================
+Oprava funkcie Subor()
+nespravny nazov suboru pre Backup(nepovolene znaky v nazve)
+
+================================================================================
+
+===================================
+2018-09-13 Verzia suboru v0.1.30.23
+===================================
+Uprava funkcie Subor()
+Doplnenie ak je chyba pri nacitavani suboru do pola 
+subor OEE sa premenuje a presunie z "./OEE.txt" do "./Backup/OEEdatum.txt"
+uprava funkcie Writelog()
+Doplnenie aby logovaci subor nepresiahol 1Mbit
+subor log sa premenuje a presunie z "./Error.log" do "./Backup/Error_datum.log"
+
+================================================================================
+
+===================================
+2017-06-28 Verzia suboru v0.1.30.21
+===================================
+Dokoncenie posielania chyby spstoerung
+Uprava funkcie log nespravne zadefinovany subor pre archivaciu.log
+
+================================================================================
+
+===================================
+2017-06-18 Verzia suboru v0.1.30.16
+===================================
+Odstranenie chyby ZISKAVANIA HWno
+nova funkcia GetMAC() ziskava Hardwarove cislo CX 1020 CX1020 z Beckhoff kartou 
+maju rovnake hardwarove cislo preto sa vytvorila nova funkcia ktora zistuje
+MAC Adresu a zapisuje ju do $sUniqueID v pozmenenom stave. V tejto funkcii sa 
+vyuziva MSdos-getmac . Nasledne Odstranenie funkcii  _GetHardwareID.au3 z
+celeho projektu.
+================================================================================
+
+======================================
+2017-06-10 Verzie suboru do v0.1.30.15
+======================================
+Sprevadzkovane Funkcie z roku 2016
+SetTime()     - Nastavuje cas systemu podla casu ziskaneho z MySQL servra
+Pripoj()      - Vytvara pripojenie k databayam na servery
+Subor()       - Nagraje udaje zo suboru do pola a maze subor po nagrati do pola
+SendData()    - Posiela udaje z pola do MySQL
+GetSetting($MysqlCon,$query)  - Poslanie dotazu "$query" na databazu "$MysqlCon" a ziskanie odpovede zo servera
+NastavenieServra()  -Ziskanie nastavenia pre TC-konektor z databaze "konfig"
+TCSetting()   - ziskanie nastaveni TC-konektora ,IPadresa ,VerziaSuboru 
+WriteLog()    - zapis logovacieho suboru chyb a archivacia Starych logov 
+================================================================================

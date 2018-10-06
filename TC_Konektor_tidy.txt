@@ -1,0 +1,702 @@
+========================================================================================================
+===  Tidy report for :J:\HW\TC_Konektor\TC_Konektor.au3
+========================================================================================================
+
+00001    #NoTrayIcon
+00002    #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+00003    #AutoIt3Wrapper_Icon=ZF.ico
+00004    #AutoIt3Wrapper_Res_Comment=ZF Slovakia Automation Pluss  TC-Konektor
+00005    #AutoIt3Wrapper_Res_Description=ZF Slovakia Automation Pluss  TC-Konektor
+00006    #AutoIt3Wrapper_Res_Fileversion=0.1.30.25
+00007    #AutoIt3Wrapper_Res_FileVersion_AutoIncrement=y
+00008    #AutoIt3Wrapper_Res_LegalCopyright=ZF Slovakia
+00009    #AutoIt3Wrapper_Res_SaveSource=y
+00010    #AutoIt3Wrapper_Res_Field=Company|ZFSlovakia
+00011    #AutoIt3Wrapper_Res_Field=Creator| Eduard Bohacek
+00012    #AutoIt3Wrapper_Res_Field=PerNo |2226
+00013    #AutoIt3Wrapper_Res_Field=Tel.no|9760
+00014    #AutoIt3Wrapper_Res_File_Add=libmysql.dll
+00015    #AutoIt3Wrapper_Run_Tidy=y
+00016    #Tidy_Parameters=/tc 3 /gd
+00017    #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
+00018    ; *** Start added by AutoIt3Wrapper ***
+00019    #include <APIDiagConstants.au3>
+00020    ; *** End added by AutoIt3Wrapper ***
+00021  +-#cs ----------------------------------------------------------------------------
+00022  |    	
+00023  |    	AutoIt Version: 3.3.14.1
+00024  |    	Author:         Eduard Bohacek
+00025  |    	
+00026  |    	Script Function:
+00027  |    	Sending Data from twincat file to Mysql server Automationpluss.
+00028  |    	
+00029  +-#ce ----------------------------------------------------------------------------
+00030    
+00031    #include "mysql.au3"
+00032    #include <FileConstants.au3>
+00033    #include <File.au3>
+00034    #include <MsgBoxConstants.au3>
+00035    #include <Array.au3>
+00036    #include <String.au3>
+00037    #include <Date.au3>
+00038    #include <GUIConstantsEx.au3>
+00039    #include <WindowsConstants.au3>
+00040    #include <Inet.au3>
+00041    #include <WinAPIFiles.au3>
+00042    
+00043    $PCV = "TC_Connector"
+00044    $ver = "1.01 2018/09/13 "
+00045    
+00046    Global $Setting1, $Setting2, $MysqlConn, $aRetArray, $Chyba, $Chyba1, $ChybaS
+00047    Global $CTime, $sUniqueID, $TCIP, $TCFV
+00048    Global $Mlog
+00049    Global $db[11][2], $Connect[10], $Setting[11][3]
+00050    $DataDir = @ScriptDir & "\Data\"
+00051    $FINI = $DataDir & "konfig.ini"
+00052    $Fdata = $DataDir & "OEE.txt"
+00053    $FTwincat = "C:\Twincat\OEE.txt"
+00054    $DirBack = $DataDir & "Backup\"
+00055    
+00056    
+00057    ; $SerIP   = Iniread($FINI,"CONFIGSERVER","ip","10.26.48.23")
+00058    $SerIP = IniRead($FINI, "CONFIGSERVER", "ip", "localhost")
+00059    $SerPort = IniRead($FINI, "CONFIGSERVER", "port", "3306")
+00060    $SerUser = IniRead($FINI, "CONFIGSERVER", "user", "oee")
+00061    $SerPass = IniRead($FINI, "CONFIGSERVER", "pwd", "eeo")
+00062    $SerDB = IniRead($FINI, "CONFIGSERVER", "db", "konfig")
+00063    
+00064    $SerNo = IniRead($FINI, "HW", "serialnr", "001352707343")
+00065    $FTwincat = IniRead($FINI, "HW", "file", "C:\Twincat\OEE.txt")
+00066    $Multi = IniRead($FINI, "HW", "multi", "0") ;Multi instancia pre viac PLC
+00067  +-If $Multi <> 0 Then
+00068  |    	$db = IniReadSection($FINI, "MULTIDB") ;$DB[0][0]udava pocet pripojeni ;$db[x+1][1]koncovka k databaze stroja
+00069  +-EndIf
+00070    
+00071    $LastE = IniRead($FINI, "SETTING", "LastEror", "0")
+00072    
+00073    ; GUICtrlSetData ("Inicializacia kniznic")
+00074    ; MYSQL Startuje, DLL na Ceste(Cesta pre DLL @ScriptDir), sont Pfad zur DLL angeben. DLL muss libmysql.dll heißen.
+00075    _MySQL_InitLibrary($DataDir & "\libmysql.dll", True)
+00076  +-If @error Then
+00077  |    	MsgBox(0, 'DLL Error', "libmysql.dll File not found")
+00078  |    	Exit
+00079  +-EndIf
+00080    
+00081    
+00082    ; Ziskanie MAC Adresy
+00083    GetMAC()
+00084    
+00085  +-If $SerNo <> $sUniqueID Then
+00086  |    	IniWrite($FINI, "HW", "serialnr", $sUniqueID) ; Zapisanie Noveho serioveho cisla
+00087  |    	$Mlog = "Zmena hardwaroveho c. : ( " & $SerNo & " ) na ( " & $sUniqueID
+00088  |    	WriteLog()
+00089  |    	$SerNo = $sUniqueID
+00090  +-EndIf
+00091    
+00092    
+00093    $main_GUI = GUICreate("OEE", 450, 20, 0, 0, $WS_POPUP, $WS_EX_TOPMOST)
+00094    ;~ $Label = GUICtrlCreateLabel("OEE Logovanie suborov", 0, 0, 450, 20, 0, 0x00000001)
+00095    ;~ GUICtrlSetData($Label, "OK")
+00096    ;~ GUISetState(@SW_SHOW)
+00097    
+00098    
+00099    
+00100    $Spoj = True
+00101    Global $Spoj2 = False
+00102    
+00103    
+00104    
+00105    
+00106    ; Main loop
+00107    ; Status: Uvolnena
+00108    ; Start : 0.0.0.0
+00109    ; Zmena : 0.1.30.15
+00110    ; Popis : Hlavny program
+00111  +-While 1
+00112  |    	$Chyba = False
+00113  |    	$ChybaS = False
+00114  |  +-	If Not $Chyba And $Spoj Then
+00115  |  |    		TCSetting()
+00116  |  |    		NastavenieServra() ; Funkcia na ziskanie nastavenie servera
+00117  |  |    		SetTime() ; Funkcia na ziskanie nastavenie servera
+00118  |  +-	EndIf
+00119  |    	;	ConsoleWrite(@CRLF & $Spoj &" "&$Chyba &" "& $Spoj2 )
+00120  |  +-	If Not $Chyba And Not $Spoj And Not $Spoj2 Then
+00121  |  |    		Pripoj()
+00122  |  +-	EndIf
+00123  |    
+00124  |    	Sleep(1000) ; prestavka v programe
+00125  |    
+00126  |    	If Not $Chyba And Not $Spoj And $Spoj2 Then Subor()
+00127  |    
+00128  |    	Sleep(1000) ; prestavka v programe
+00129  |    
+00130  |    	If Not $Chyba And Not $Spoj And $Spoj2 And Not $ChybaS Then SendData()
+00131  |    
+00132  |    	Sleep(1000) ; prestavka v programe
+00133  |    
+00134  |    	If $Chyba Then WriteLog()
+00135  |    
+00136  +-WEnd
+00137    
+00138    ; Hardvare()nedokoncene
+00139    ; Status: beta
+00140    ; Start : 0.1.30.15
+00141    ; Zmena : 0.1.30.15
+00142    ; Popis: Ziskanie HardwareNo a Updatovanie na servery
+00143    ;~ Func HWupdate($sn,)
+00144    ;	if  $SerNo <> $sUniqueID Then
+00145    ;		IniWrite($FINI,"HW","serialnr",$sUniqueID) ; Zapisanie Noveho serioveho cisla
+00146    ;		If $Multi == 0 Then
+00147    ;
+00148    ;			IniWrite($FINI,"HW","serialnr",$sUniqueID) ; Zapisanie Noveho serioveho cisla
+00149    ;		Else
+00150    ;
+00151    ;		EndIf
+00152    ;
+00153    ;
+00154    ;	Else
+00155    ;		$HWOk = True
+00156    ;	EndIf
+00157    ;	$SerNo = $sUniqueID
+00158    ;~ EndFunc   ;==>HWupdate
+00159    
+00160    
+00161    ; SetTime()
+00162    ; Status: uvolnena
+00163    ; Start : 0.1.30.15
+00164    ; Zmena : 0.1.30.15
+00165    ; Popis: Nastav cas na PC podla servera
+00166  +-Func SetTime()
+00167  |  +-	If Not $Chyba Then
+00168  |  |    		$ArayTime = _StringExplode($CTime[1][0], " ", 0)
+00169  |  |    		$ADate = _StringExplode($ArayTime[0], "-", 0)
+00170  |  |    		$ATime = _StringExplode($ArayTime[1], ":", 0)
+00171  |  |    		$tNew = _Date_Time_EncodeSystemTime($ADate[1], $ADate[2], $ADate[0], $ATime[0], $ATime[1], $ATime[2])
+00172  |  |  +-		If Not _Date_Time_SetLocalTime($tNew) Then
+00173  |  |  |    			MsgBox($MB_SYSTEMMODAL, @CRLF & "Chyba", "Systemove hodiny sa nedaju nastavit:" & _WinAPI_GetLastErrorMessage())
+00174  |  |  |    			$Mlog = "Systemove hodiny sa nedaju nastavit:" & _WinAPI_GetLastErrorMessage()
+00175  |  |  |    			;			GUICtrlSetData ($Label,"Systemove hodiny sa nedaju nastavit")
+00176  |  |  |    			$Chyba = True
+00177  |  |  |    			Exit
+00178  |  |  +-		EndIf
+00179  |  +-	EndIf
+00180  +-EndFunc   ;==>SetTime
+00181    
+00182    ; Pripoj()
+00183    ; Status: uvolnena
+00184    ; Start : 0.1.30.15
+00185    ; Zmena : 0.1.30.15
+00186    ; Popis: vytvorenie pripojeni k tabulkam na servery
+00187  +-Func Pripoj()
+00188  |    	$c = 1
+00189  |    
+00190  |  +-	If $Multi = 0 Then
+00191  |  |    		$Connect[1] = _MySQL_Init()
+00192  |  |    		Local $Setting1 = $Setting[1][0]
+00193  |  |    		Local $ConServer = _MySQL_Real_Connect($Connect[1], $Setting1[1][0], $Setting1[1][1], $Setting1[1][2], $Setting1[1][3])
+00194  |  |    ;~       ConsoleWrite(@CRLF & "connect  :" & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
+00195  |  |  +-		If $ConServer = 0 Then
+00196  |  |  |    			$Mlog = "MySQL pripojenie neuspesne"
+00197  |  |  |    			$Chyba = True
+00198  |  |  |    			$Spoj2 = False
+00199  |  |  |    			Return
+00200  |  |  +-		Else
+00201  |  |  |    			$Chyba = False
+00202  |  |  |    			$Chyba2 = ""
+00203  |  |  |    			$Mlog = "Nove pripojenie na MySQL databazu: " & $Setting1[1][3]
+00204  |  |  +-		EndIf
+00205  |  |    		$Spoj2 = True
+00206  |  +-	Else
+00207  |  |    		$Mlog = "Nove pripojenia na MySQL databazy: "
+00208  |  |  +-		For $c = 1 To $db[0][0] Step 1
+00209  |  |  |    			$Connect[$c] = _MySQL_Init()
+00210  |  |  |    			Local $Setting1 = $Setting[$c][0]
+00211  |  |  |    			;_ArrayDisplay($setting1,"Settingov")
+00212  |  |  |    			;;;;;;;;;;;;;_MySQL_Real_Connect("Pripojenie=$Connect[$c]","IP Servra","uzivatel","Heslo","databaza");;;;;;;;;;;;;;;;;;;;;;
+00213  |  |  |    			Local $ConServer = _MySQL_Real_Connect($Connect[$c], $Setting1[1][0], $Setting1[1][1], $Setting1[1][2], $Setting1[1][3])
+00214  |  |  |    ;~          ConsoleWrite(@CRLF & "connect  :  " & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
+00215  |  |  |  +-			If $ConServer = 0 Then
+00216  |  |  |  |    				$Mlog = "MySQL pripojenie neuspesne"
+00217  |  |  |  |    				$Chyba = True
+00218  |  |  |  |    				$Spoj2 = False
+00219  |  |  |  |    				Return
+00220  |  |  |  +-			Else
+00221  |  |  |  |    				$Chyba = False
+00222  |  |  |  |    				$Chyba2 = ""
+00223  |  |  |  |    				$Mlog = $Mlog & ", " & $Setting1[1][3]
+00224  |  |  |  +-			EndIf
+00225  |  |  +-		Next
+00226  |  |    		$Spoj2 = True
+00227  |  +-	EndIf
+00228  +-EndFunc   ;==>Pripoj
+00229    
+00230    ; Subor()
+00231    ; Status: uvolnena
+00232    ; Start : 0.1.30.15
+00233    ; Zmena : 0.1.30.22
+00234    ; Popis: Load Data from File to Array and delete file
+00235  +-Func Subor()
+00236  |    	;GUICtrlSetData ($Label,"Ziskavanie dat")
+00237  |  +-	If Not FileExists($Fdata) And FileExists($FTwincat) Then ; zistenie ci boli odoslane predchadzajuce data a ci existuje zdrojovy subor
+00238  |  |    		FileMove($FTwincat, $Fdata, $FC_NOOVERWRITE + $FC_CREATEPATH) ; ked boli odoslane presun subor zo zdroja
+00239  |  |  +-		If @error Then
+00240  |  |  |    			$Mlog = "Chyba kopirovania suboru zo zdroja na docasne miesto"
+00241  |  |  |    			$ChybaS = True
+00242  |  |  +-		EndIf
+00243  |  +-	EndIf
+00244  |    	$Filesize = FileGetSize($Fdata) ; zisti velkost suboru ci nieje prazdny
+00245  |    
+00246  |  +-	If $Filesize > 10 Then ; Ak subor nieje prazdny alebo prilis maly
+00247  |  |    		_FileReadToArray($Fdata, $aRetArray, Default, "|") ; nactanie obsahu subora do pola
+00248  |  |  +-		If @error Then
+00249  |  |  |    			Local $Cas1 = _Date_Time_GetSystemTime()
+00250  |  |  |    			Local $cas = _Date_Time_SystemTimeToDateTimeStr($Cas1)
+00251  |  |  |    			$cas = StringReplace($cas, "/", "_")
+00252  |  |  |    			$cas = StringReplace($cas, ":", "_")
+00253  |  |  |    			Local $FBackup = $DirBack & "OEE_" & $cas & ".txt" ;Zalozny subor cestaskriptu / Backup/OEE_d_a_t_u_m.txt
+00254  |  |  |    			FileMove($Fdata, $FBackup, $FC_CREATEPATH) ;premiestni subor do Backup Adresara
+00255  |  |  |    			$Mlog = "Chyba nacitania suboru " & $Fdata & ": " & @error & ". Premiestnujem do " & $FBackup
+00256  |  |  |    			$ChybaS = True ; nastavenie chyby
+00257  |  |  |    			$Chyba = True ; nastavenie chyby
+00258  |  |  |    			;FileDelete() ;vymazanie suboru
+00259  |  |  +-		EndIf
+00260  |  +-	Else
+00261  |  |  +-		If FileExists($Fdata) Then
+00262  |  |  |    			FileDelete($Fdata) ;vymazanie suboru
+00263  |  |  |    			ConsoleWrite(@CRLF & "Vymazanie subotu " & $Fdata)
+00264  |  |  +-		EndIf
+00265  |  |    		$ChybaS = True ; nastavenie chyby
+00266  |  |    		$Chyba = True ; nastavenie chyby
+00267  |  +-	EndIf
+00268  |    
+00269  +-EndFunc   ;==>Subor
+00270    
+00271    ; SendData()
+00272    ; Status: beta
+00273    ; Start : 0.1.30.15
+00274    ; Zmena : 0.1.30.22
+00275    ; Popis: Send data to Mysql
+00276  +-Func SendData()
+00277  |    ;~    _ArrayDisplay($aRetArray, "Edo")
+00278  |    	$b = 0
+00279  |    	If $Setting1 == 0 Then $b = 1 ; osetrenie nenajdeneho id
+00280  |  +-	While $b == 0
+00281  |  |    
+00282  |  |  +-		For $k = 1 To $aRetArray[0][0]
+00283  |  |  |    			$Date = StringMid($aRetArray[$k][0], 1, 10) & " " & StringMid($aRetArray[$k][0], 12, 8) ;Prepocet Datumu zo
+00284  |  |  |    			$Stanica = $aRetArray[$k][1] ;Ziskanie Cisla stanice
+00285  |  |  |    			$Status = $aRetArray[$k][2] ;Ziskanie Statusu stroja
+00286  |  |  |    			$io_nio = $aRetArray[$k][3] ;Ziskanie stavu dielu
+00287  |  |  |    			$AEror = $aRetArray[$k][4] ;Zistenie aktualnej chyby
+00288  |  |  |    			$OEror = $aRetArray[$k][5] ;Zistenie predchadzajuceho stavu chyby
+00289  |  |  |    			;ConsoleWrite(@CRLF & "Data "&$io_nio& )
+00290  |  |  |    
+00291  |  |  |  +-			If $io_nio == "-1" And $LastE == $AEror Then ; Ak nebol vyrobeny kus
+00292  |  |  |  |    				;Poslanie stavu stroja nebol vyrobeny kus
+00293  |  |  |  |    				$dbQuery = "Call betriebszust( '" & $Date & "'," & $Status & ",0)" ; vytvorenie dopytu stavu stroja
+00294  |  |  |  |    				ConsoleWrite(@CRLF & "Stanica" & ($Stanica + 1) & $dbQuery) ; Poslanie dopytu na konzolu
+00295  |  |  |  |    				$sql = GetSetting($Connect[$Stanica + 1], $dbQuery) ; Poslanie dopytu na server ( ziskanie odpovede asi zbytocne!!)
+00296  |  |  |  +-			EndIf
+00297  |  |  |    
+00298  |  |  |  +-			If $io_nio >= 0 And $LastE == $AEror Then
+00299  |  |  |  |    				; Bol vyrobeny kus s OK alebo NGx vysledkom
+00300  |  |  |  |    				$dbQuery = "Call spprodukt(-1 ,'" & $Date & "'," & $io_nio & ",0,0,'','')" ; vytvorenie dopytu stavu dielu
+00301  |  |  |  |    				ConsoleWrite(@CRLF & "Stanica" & ($Stanica + 1) & $dbQuery) ; Poslanie dopytu na konzolu
+00302  |  |  |  |    				$sql = GetSetting($Connect[$Stanica + 1], $dbQuery) ; Poslanie dopytu na server ( ziskanie odpovede asi zbytocne!!)
+00303  |  |  |  +-			EndIf
+00304  |  |  |    
+00305  |  |  |  +-			If $LastE <> $AEror Then
+00306  |  |  |  |    				;Poslanie chybovej hlasky alebo reset hlasky
+00307  |  |  |  |    				$dbQuery = "Call spstoerung( " & $OEror & ", " & $AEror & ", 1, '" & $Date & "',0)"
+00308  |  |  |  |    				ConsoleWrite(@CRLF & $dbQuery)
+00309  |  |  |  |    				$sql = GetSetting($Connect[$Stanica + 1], $dbQuery)
+00310  |  |  |  |    				$LastE = $AEror
+00311  |  |  |  |    				IniWrite($FINI, "SETTING", "LaastEror", $LastE) ; Zapisanie poslednej chyby do ini Aby bol zabezpeceny reset chyby pri restarte stroja
+00312  |  |  |  +-			EndIf
+00313  |  |  |    
+00314  |  |  |    			; Nedokoncene posielanie chyb na server
+00315  |  |  |    
+00316  |  |  |    
+00317  |  |  |    			;$ConServer[]
+00318  |  |  |    			$Chyba1 = _MySQL_Error($Connect[$Stanica + 1]) ; Zistenie chyby zo servra
+00319  |  |  |  +-			If $Chyba1 <> "" Then ; Ak je chyba
+00320  |  |  |  |    				$Mlog = "Data Error: " & $Chyba1
+00321  |  |  |  |    				ConsoleWrite(@CRLF & "Stanica" & ($Stanica + 1) & "Data Error: " & $Chyba1) ; Zapisanie Chyby zo servera
+00322  |  |  |  |    				$Spoj2 = False ; Spoj2 false aby dalej neposielalo data
+00323  |  |  |  |    ;~             GUISetState(@SW_SHOW) ; Zobrazenie GUI
+00324  |  |  |  |    				Return ; vyhodenie z funkcie aby sa nezmazal subor
+00325  |  |  |  +-			EndIf
+00326  |  |  +-		Next
+00327  |  |  +-		If FileExists($Fdata) Then
+00328  |  |  |    			FileDelete($Fdata) ; Po skoceni posielania dat vymaze subor
+00329  |  |  |    			$Mlog = "Mazanie suboru po odoslani dat"
+00330  |  |  |    			ConsoleWrite(@CRLF & "mazanie suboru OEE.TXT")
+00331  |  |  +-		EndIf
+00332  |  |    		$b = 1
+00333  |  |    
+00334  |  +-	WEnd
+00335  |    
+00336  +-EndFunc   ;==>SendData
+00337    
+00338    
+00339    ; GetSetting()
+00340    ; Status: uvolnena
+00341    ; Start : 0.1.30.15
+00342    ; Zmena : 0.1.30.15
+00343    ; Popis: Poslanie dotazu a ziskanie odpovede z MySQL
+00344  +-Func GetSetting($MysqlCon, $query)
+00345  |    
+00346  |    	_MySQL_Real_Query($MysqlCon, $query) ; Poslanie na server dopytu na server
+00347  |    	$res = _MySQL_Store_Result($MysqlCon) ; Zapametanie odpovede zo servra
+00348  |    	$rows = _MySQL_Num_Rows($res) ; zistenie poctu riadkov
+00349  |    	$array = _MySQL_Fetch_Result_StringArray($res) ; Zapisanie vysledku do pola
+00350  |    	Return $array ; vratenie vysledku funkcie
+00351  |    
+00352  +-EndFunc   ;==>GetSetting
+00353    
+00354    
+00355    ; NastavenieServra()
+00356    ; Status: uvolnena
+00357    ; Start : 0.1.30.15
+00358    ; Zmena : 0.1.30.15
+00359    ; Popis: Get data from Mysql Konfig
+00360  +-Func NastavenieServra()
+00361  |    	$MysqlConn = _MySQL_Init() ; vytvorenie pripojenia
+00362  |    	;pripojenie k servru na konfig a zistenie nastavenia stroja
+00363  |    	; Connecting to server db konfig
+00364  |    	;_MySQL_Real_Connect($MysqlConn,"IP Server","User","Password","Database")
+00365  |    	$ConServer1 = _MySQL_Real_Connect($MysqlConn, $SerIP, $SerUser, $SerPass, $SerDB)
+00366  |  +-	If Not $ConServer1 = 0 Then
+00367  |  |    		; Get data for Machine
+00368  |  |  +-		If $Multi == 0 Then ;pripad pre jeden stroj
+00369  |  |  |    			$db[1][1] = ""
+00370  |  |  |    			$db[0][0] = 1
+00371  |  |  +-		EndIf
+00372  |  |    
+00373  |  |  +-		For $d = 1 To $db[0][0] Step 1
+00374  |  |  |    			$No = $SerNo & $db[$d][1]
+00375  |  |  |    			$dbQuery = "SELECT database_ip,user,pwd,datenbank,endprellzeit, mitPD, eingang " & _
+00376  |  |  |  |       					"FROM phoenix WHERE seriennr = '" & $No & "'"
+00377  |  |  |    			ConsoleWrite(@CRLF & $dbQuery)
+00378  |  |  |    			$Setting[$d][0] = GetSetting($MysqlConn, $dbQuery)
+00379  |  |  |    			ConsoleWrite(@CRLF & $Setting[$d][0])
+00380  |  |  |    
+00381  |  |  |    			$dbQuery = "SELECT anlage_bezeichnung, ip, part_factor, dns_name, DnsServer, Domain" & _
+00382  |  |  |  |       					"FROM phoenix inner join anlage on anlage_nummer=datenbank WHERE seriennr = '" & $No & "'"
+00383  |  |  |    			ConsoleWrite(@CRLF & $dbQuery)
+00384  |  |  |    			$Setting[$d][1] = GetSetting($MysqlConn, $dbQuery)
+00385  |  |  |    
+00386  |  |  |    			ConsoleWrite(@CRLF & $Setting[$d][1])
+00387  |  |  |    
+00388  |  |  |    			$dbQuery = "UPDATE phoenix SET aktuelle_ip = '" & $TCIP & _
+00389  |  |  |  |       					"',zeitstempel = now(), controllertype = 'TC-connector" & _
+00390  |  |  |  |       					"',firmware = '4.35 13/09/18" & _
+00391  |  |  |  |       					"', version = '" & $TCFV & _
+00392  |  |  |  |       					"', seriennr = '" & $No & _
+00393  |  |  |  |       					"', MacAdresse = '' WHERE seriennr = '" & $No & "'"
+00394  |  |  |    			ConsoleWrite(@CRLF & $dbQuery)
+00395  |  |  |    			$Setting[$d][2] = GetSetting($MysqlConn, $dbQuery)
+00396  |  |  |    			ConsoleWrite(@CRLF & $Setting[$d][2])
+00397  |  |  +-		Next
+00398  |  |    
+00399  |  |    		; Get Actual Date from MySQL server
+00400  |  |    		$dbQuery = "SELECT NOW()"
+00401  |  |    		ConsoleWrite($dbQuery & @CRLF)
+00402  |  |    		$CTime = GetSetting($MysqlConn, $dbQuery)
+00403  |  |    		ConsoleWrite($CTime[1][0] & @CRLF)
+00404  |  |    		_MySQL_Close($MysqlConn) ;Close Connection on server
+00405  |  |    
+00406  |  |    		; treba poriesit nastavenia z ostatnych nastaveni ako ip domenove meno atd...
+00407  |  |    ;~       _ArrayDisplay($Setting, "")
+00408  |  |    
+00409  |  |  +-		If $Setting[1][0] == 0 Or $Setting[2][0] == 0 Or $Setting[3][0] == 0 Or $Setting[4][0] == 0 Then
+00410  |  |  |    			$Spoj = True
+00411  |  |  +-		Else
+00412  |  |  |    			$Spoj = False
+00413  |  |  +-		EndIf
+00414  |  |    
+00415  |  +-	Else
+00416  |  |    
+00417  |  |    		ConsoleWrite(@CRLF & "Konfig Error : " & _MySQL_Error($MysqlConn))
+00418  |  |    		$Mlog = "Konfig Error : " & _MySQL_Error($MysqlConn)
+00419  |  |    		$Chyba = True
+00420  |  |    
+00421  |  +-	EndIf
+00422  |    
+00423  +-EndFunc   ;==>NastavenieServra
+00424    
+00425    ; TCSetting()
+00426    ; Status: uvolnena
+00427    ; Start : 0.1.30.15
+00428    ; Zmena : 0.1.30.15
+00429    ; Popis: Ziskanie nastaveni TC-konektora
+00430  +-Func TCSetting()
+00431  |    	$TCIP = @IPAddress1 ; ziskanie IP adresy z aktualneho pripojenia
+00432  |    	;   $TCMAC =
+00433  |    	$TCFV = FileGetVersion(@ScriptFullPath) ; Ziskanie verzie suboru zo samotneho suboru
+00434  |    
+00435  |    ;~    $Mlog = "verzia suboru : " & $TCFV
+00436  |    
+00437  |    ;~    ConsoleWrite(@CRLF & @ScriptFullPath)
+00438  |    
+00439  +-EndFunc   ;==>TCSetting
+00440    
+00441    ; WriteLog()
+00442    ; Status: beta
+00443    ; Start : 0.1.30.15
+00444    ; Zmena : 0.1.30.23
+00445    ; Popis: Write data to log File
+00446  +-Func WriteLog()
+00447  |    
+00448  |  +-	If $Mlog <> "" Then
+00449  |  |    		Local $LogFile = $DataDir & "Error.log"
+00450  |  |    		Local $LogSize = FileGetSize($LogFile)
+00451  |  |    		Local $Cas1 = _Date_Time_GetSystemTime()
+00452  |  |    		Local $cas = _Date_Time_SystemTimeToDateTimeStr($Cas1)
+00453  |  |    		$cas = StringReplace($cas, "/", "_")
+00454  |  |    		$cas = StringReplace($cas, ":", "_")
+00455  |  |    ;~       ConsoleWrite(@CRLF & $LogSize)
+00456  |  |  +-		If $LogSize >= "1000000" Then
+00457  |  |  |    			ConsoleWrite(@CRLF & $LogSize & $DataDir & $cas & "Archive.log")
+00458  |  |  |    			FileMove($LogFile, $DirBack & "Error_" & $cas & ".log", $FC_OVERWRITE & $FC_CREATEPATH)
+00459  |  |  +-		EndIf
+00460  |  |    		Local $hFileLOG = FileOpen($LogFile, $FO_APPEND)
+00461  |  |    		$Mlog = $cas & " : " & $Mlog ; Pripisanie casu k hlaseniu
+00462  |  |    		FileWriteLine($hFileLOG, $Mlog)
+00463  |  |    		$Mlog = ""
+00464  |  |    		FileClose($hFileLOG)
+00465  |  |    
+00466  |  +-	EndIf
+00467  +-EndFunc   ;==>WriteLog
+00468    
+00469    ; GetMAC()
+00470    ; Status: uvolnena
+00471    ; Start : 0.1.30.15
+00472    ; Zmena : 0.1.30.16
+00473    ; Popis: Ziskanie Unikatneho cisla z macAdresy prvej sietovej karty
+00474  +-Func GetMAC()
+00475  |    	$FMAC = "C:\Data\Mac.txt"
+00476  |    	RunWait(@ComSpec & ' /c getmac > "C:\Data\Mac.txt"')
+00477  |    	Local $hFileOpen = FileOpen("C:\Data\Mac.txt", $FO_READ)
+00478  |    ;~ 	If $hFileOpen = -1 Then
+00479  |    ;~ 		MsgBox($MB_SYSTEMMODAL, "", "An error occurred when reading the file.")
+00480  |    ;~ 		Return False
+00481  |    ;~ 	EndIf
+00482  |    	Local $sFileRead = FileReadLine($hFileOpen, 4) ; Nacitanie Obsahu suboru.Subor pouziva popisovac funkcie FileOpen.
+00483  |    	$sFileRead = StringReplace(StringLeft($sFileRead, 17), "-", "") ; orezanie a nahradenie pomlciek
+00484  |    	FileClose($hFileOpen) ; Zavrieť popisovača vráteneho aplikaciou FileOpen. Close the handle returned by FileOpen.
+00485  |    	FileDelete($FMAC) ; Vymazanie docasneho suboru.
+00486  |    	$sUniqueID = $sFileRead
+00487  |    
+00488  +-EndFunc   ;==>GetMAC
+
+======================
+=== xref reports =====
+======================
+
+== User functions =================================================================================================
+                          Func
+Function name             Row     Referenced at Row(s)
+========================= ====== ==================================================================================
+GetMAC                    00474 
+GetSetting                00344 
+NastavenieServra          00360 
+Pripoj                    00187 
+SendData                  00276 
+SetTime                   00166 
+Subor                     00235 
+TCSetting                 00430 
+WriteLog                  00446 
+
+#### indicates that this specific variable only occurs one time in the script.
+---- indicates that this specific variable isn't declared with Dim/Local/Global/Const.
+
+== Variables ======================================================================================================
+Variable name             Dim   Used in Row(s)
+========================= ===== ===================================================================================
+#AutoIt3Wrapper_Icon      ----- 00003
+#AutoIt3Wrapper_Res_Comment  ----- 00004
+#AutoIt3Wrapper_Res_Description  ----- 00005
+#AutoIt3Wrapper_Res_Field  ----- 00010 00011 00012 00013
+#AutoIt3Wrapper_Res_FileVersion_AutoIncrement  ----- 00007
+#AutoIt3Wrapper_Res_File_Add  ----- 00014
+#AutoIt3Wrapper_Res_Fileversion  ----- 00006
+#AutoIt3Wrapper_Res_LegalCopyright  ----- 00008
+#AutoIt3Wrapper_Res_SaveSource  ----- 00009
+#AutoIt3Wrapper_Run_Tidy  ----- 00015
+#EndRegion                ----- 00017
+#NoTrayIcon               ----- 00001
+#Region                   ----- 00002
+#Tidy_Parameters          ----- 00016
+#include                  ----- 00019 00031 00032 00033 00034 00035 00036 00037 00038 00039 00040 00041
+$ADate                    ----- 00169 00171
+$AEror                    ----- 00287 00291 00298 00305 00307 00310
+$ATime                    ----- 00170 00171
+$ArayTime                 ----- 00168 00169 00170
+$CTime                    ----- 00047 00168 00402 00403
+$Cas1                     ----- 00249 00250 00451 00452
+$Chyba                    ----- 00046 00112 00114 00120 00126 00130 00134 00167 00176 00197 00201 00217 00221 00257 
+                                00266 00419
+$Chyba1                   ----- 00046 00318 00319 00320 00321
+$Chyba2                   ----- 00202 00222
+$ChybaS                   ----- 00046 00113 00130 00241 00256 00265
+$ConServer                ----- 00193 00195 00213 00215
+$ConServer1               ----- 00365 00366
+$Connect                  ----- 00049 00191 00193 00209 00213 00295 00302 00309 00318
+$DataDir                  ----- 00050 00051 00052 00054 00075 00449 00457
+$Date                     ----- 00283 00293 00300 00307
+$DirBack                  ----- 00054 00253 00458
+$FBackup                  ----- 00253 00254 00255
+$FC_CREATEPATH            ----- 00238 00254 00458
+$FC_NOOVERWRITE           ----- 00238
+$FC_OVERWRITE             ----- 00458
+$FINI                     ----- 00051 00058 00059 00060 00061 00062 00064 00065 00066 00068 00071 00086 00311
+$FMAC                     ----- 00475 00485
+$FO_APPEND                ----- 00460
+$FO_READ                  ----- 00477
+$FTwincat                 ----- 00053 00065 00237 00238
+$Fdata                    ----- 00052 00237 00238 00244 00247 00254 00255 00261 00262 00263 00327 00328
+$Filesize                 ----- 00244 00246
+$LastE                    ----- 00071 00291 00298 00305 00310 00311
+$LogFile                  ----- 00449 00450 00458 00460
+$LogSize                  ----- 00450 00456 00457
+$MB_SYSTEMMODAL           ----- 00173
+$Mlog                     ----- 00048 00087 00174 00196 00203 00207 00216 00223 00240 00255 00320 00329 00418 00448 
+                                00461 00462 00463
+$Multi                    ----- 00066 00067 00190 00368
+$MysqlCon                 ----- 00344 00346 00347
+$MysqlConn                ----- 00046 00361 00365 00378 00384 00395 00402 00404 00417 00418
+$No                       ----- 00374 00375 00381 00388
+$OEror                    ----- 00288 00307
+$PCV                      ----- 00043
+$SerDB                    ----- 00062 00365
+$SerIP                    ----- 00058 00365
+$SerNo                    ----- 00064 00085 00087 00089 00374
+$SerPass                  ----- 00061 00365
+$SerPort                  ----- 00059
+$SerUser                  ----- 00060 00365
+$Setting                  ----- 00049 00192 00210 00378 00379 00384 00386 00395 00396 00409
+$Setting1                 ----- 00046 00192 00193 00203 00210 00213 00223 00279
+$Setting2                 ----- 00046
+$Spoj                     ----- 00100 00114 00120 00126 00130 00410 00412
+$Spoj2                    ----- 00101 00120 00126 00130 00198 00205 00218 00226 00322
+$Stanica                  ----- 00284 00294 00295 00301 00302 00309 00318 00321
+$Status                   ----- 00285 00293
+$TCFV                     ----- 00047 00388 00433
+$TCIP                     ----- 00047 00388 00431
+$WS_EX_TOPMOST            ----- 00093
+$WS_POPUP                 ----- 00093
+$aRetArray                ----- 00046 00247 00282 00283 00284 00285 00286 00287 00288
+$array                    ----- 00349 00350
+$b                        ----- 00278 00279 00280 00332
+$c                        ----- 00188 00208 00209 00210 00213
+$cas                      ----- 00250 00251 00252 00253 00452 00453 00454 00457 00458 00461
+$d                        ----- 00373 00374 00378 00379 00384 00386 00395 00396
+$db                       ----- 00049 00068 00208 00369 00370 00373 00374
+$dbQuery                  ----- 00293 00294 00295 00300 00301 00302 00307 00308 00309 00375 00377 00378 00381 00383 
+                                00384 00388 00394 00395 00400 00401 00402
+$hFileLOG                 ----- 00460 00462 00464
+$hFileOpen                ----- 00477 00482 00484
+$io_nio                   ----- 00286 00291 00298 00300
+$k                        ----- 00282 00283 00284 00285 00286 00287 00288
+$main_GUI                 ----- 00093
+$query                    ----- 00344 00346
+$res                      ----- 00347 00348 00349
+$rows                     ----- 00348
+$sFileRead                ----- 00482 00483 00486
+$sUniqueID                ----- 00047 00085 00086 00087 00089 00486
+$sql                      ----- 00295 00302 00309
+$tNew                     ----- 00171 00172
+$ver                      ----- 00044
+0                         ----- 00067 00077 00093 00168 00169 00170 00171 00190 00192 00193 00195 00208 00210 00213 
+                                00215 00278 00279 00280 00282 00283 00298 00366 00368 00370 00373 00378 00379 00403 
+                                00409
+1                         ----- 00111 00168 00170 00171 00188 00191 00192 00193 00203 00208 00213 00223 00279 00282 
+                                00283 00284 00294 00295 00301 00302 00309 00318 00321 00332 00369 00370 00373 00374 
+                                00384 00386 00403 00409
+10                        ----- 00049 00246 00283
+1000                      ----- 00124 00128 00132
+11                        ----- 00049
+12                        ----- 00283
+17                        ----- 00483
+2                         ----- 00049 00171 00193 00213 00285 00395 00396 00409
+20                        ----- 00093
+3                         ----- 00049 00193 00203 00213 00223 00286 00409
+4                         ----- 00287 00409 00482
+450                       ----- 00093
+5                         ----- 00288
+8                         ----- 00283
+@CRLF                     ----- 00173 00263 00294 00301 00308 00321 00330 00377 00379 00383 00386 00394 00396 00401 
+                                00403 00417 00457
+@ComSpec                  ----- 00476
+@IPAddress1               ----- 00431
+@ScriptDir                ----- 00050
+@ScriptFullPath           ----- 00433
+@error                    ----- 00076 00239 00248 00255
+APIDiagConstants          ----- 00019
+And                       ----- 00114 00120 00126 00130 00237 00291 00298
+Array                     ----- 00035
+#### CTime                00047
+Cas1                      00249 00451
+#### Chyba                00046
+#### Chyba1               00046
+#### ChybaS               00046
+ConServer                 00193 00213
+#### Connect              00049
+Date                      ----- 00037
+Default                   ----- 00247
+Else                      ----- 00200 00206 00220 00260 00411 00415
+EndFunc                   ----- 00180 00228 00269 00336 00352 00423 00439 00467 00488
+EndIf                     ----- 00069 00079 00090 00118 00122 00178 00179 00204 00224 00227 00242 00243 00259 00264 
+                                00267 00296 00303 00312 00325 00331 00371 00413 00421 00459 00466
+Exit                      ----- 00078 00177
+#### FBackup              00253
+False                     ----- 00101 00112 00113 00198 00201 00218 00221 00322 00412
+File                      ----- 00033
+FileConstants             ----- 00032
+For                       ----- 00208 00282 00373
+Func                      ----- 00166 00187 00235 00276 00344 00360 00430 00446 00474
+GUIConstantsEx            ----- 00038
+Global                    ----- 00046 00047 00048 00049 00101
+If                        ----- 00067 00076 00085 00114 00120 00126 00130 00134 00167 00172 00190 00195 00215 00237 
+                                00239 00246 00248 00261 00279 00291 00298 00305 00319 00327 00366 00368 00409 00448 
+                                00456
+Inet                      ----- 00040
+Local                     ----- 00192 00193 00210 00213 00249 00250 00253 00449 00450 00451 00452 00460 00477 00482
+#### LogFile              00449
+#### LogSize              00450
+#### Mlog                 00048
+MsgBoxConstants           ----- 00034
+#### MysqlCon             00344
+#### MysqlConn            00046
+Next                      ----- 00225 00326 00397
+Not                       ----- 00114 00120 00126 00130 00167 00172 00237 00366
+Or                        ----- 00409
+Return                    ----- 00199 00219 00324 00350
+#### Setting              00049
+Setting1                  00046 00192 00210
+#### Setting2             00046
+#### Spoj2                00101
+Step                      ----- 00208 00373
+String                    ----- 00036
+#### TCFV                 00047
+#### TCIP                 00047
+Then                      ----- 00067 00076 00085 00114 00120 00126 00130 00134 00167 00172 00190 00195 00215 00237 
+                                00239 00246 00248 00261 00279 00291 00298 00305 00319 00327 00366 00368 00409 00448 
+                                00456
+To                        ----- 00208 00282 00373
+True                      ----- 00075 00100 00176 00197 00205 00217 00226 00241 00256 00257 00265 00266 00410 00419
+WEnd                      ----- 00136 00334
+While                     ----- 00111 00280
+WinAPIFiles               ----- 00041
+WindowsConstants          ----- 00039
+#### aRetArray            00046
+au3                       ----- 00019 00032 00033 00034 00035 00036 00037 00038 00039 00040 00041
+cas                       00250 00452
+#### db                   00049
+#### hFileLOG             00460
+#### hFileOpen            00477
+#### query                00344
+#### sFileRead            00482
+#### sUniqueID            00047
