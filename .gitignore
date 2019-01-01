@@ -3,7 +3,7 @@
 .fuse_hidden*
 
 ## Project files ######
-BackUP
+BackUP1
 Pomoc
 .gcc-flags.json
 sonoff/user_config_override.h
