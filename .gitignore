@@ -1,0 +1,13 @@
+## OS specific ########
+.DS_Store
+.fuse_hidden*
+
+## Project files ######
+BackUP
+Pomoc
+.gcc-flags.json
+sonoff/user_config_override.h
+build
+
+## Visual Studio Code specific ######
+.vscode

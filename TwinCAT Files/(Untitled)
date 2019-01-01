@@ -1,0 +1,18 @@
+Declarations of the global constants
+Declarations of the global library constants
+Declarations of the global constants
+Declarations of the global library constants
+Interface of POU 'MAIN'
+Declarations of the global variables
+Data allocation
+Check task configuration
+Implementation of POU 'MAIN'
+Error 4371: MAIN (1): Invalid characters following valid expression: '1S'
+Error 4301: MAIN (1): POU 'TON' needs exactly 2 inputs
+Warning 1500: MAIN (1): This expression does not contain an assignment. No code generated.
+Error 4371: MAIN (2): Invalid characters following valid expression: '1S'
+Error 4301: MAIN (2): POU 'TON' needs exactly 2 inputs
+Warning 1500: MAIN (2): This expression does not contain an assignment. No code generated.
+Implementation of task 'Standard'
+Warning 1990: No 'VAR_CONFIG' for 'Machine1I'
+Warning 1990: No 'VAR_CONFIG' for 'Machine1O'

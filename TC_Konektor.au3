@@ -1,4 +1,4 @@
-#NoTrayIcon
+;#NoTrayIcon
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=ZF.ico
 #AutoIt3Wrapper_Res_Comment=ZF Slovakia Automation Pluss  TC-Konektor
@@ -61,9 +61,13 @@ $SerUser = IniRead($FINI, "CONFIGSERVER", "user", "oee")
 $SerPass = IniRead($FINI, "CONFIGSERVER", "pwd", "eeo")
 $SerDB = IniRead($FINI, "CONFIGSERVER", "db", "konfig")
 
+$IPip = IniRead($FINI, "IP", "ip", "localhost")
+
 $SerNo = IniRead($FINI, "HW", "serialnr", "001352707343")
+
 $FTwincat = IniRead($FINI, "HW", "file", "C:\Twincat\OEE.txt")
 $Multi = IniRead($FINI, "HW", "multi", "0") ;Multi instancia pre viac PLC
+
 If $Multi <> 0 Then
    $db = IniReadSection($FINI, "MULTIDB") ;$DB[0][0]udava pocet pripojeni ;$db[x+1][1]koncovka k databaze stroja
 EndIf
@@ -80,20 +84,31 @@ EndIf
 
 
 ; Ziskanie MAC Adresy
-GetMAC()
+$sUniqueID = GetMAC()
+MsgBox(0, "MAC Address:", $sUniqueID)
+
+If $sUniqueID == '000000000000' Then
+
+   $Mlog = "Nenajdena MAC z IP: ( " & $IPip & " )"
+   WriteLog()
+   Exit
+EndIf
+
+
+
 
 If $SerNo <> $sUniqueID Then
    IniWrite($FINI, "HW", "serialnr", $sUniqueID) ; Zapisanie Noveho serioveho cisla
-   $Mlog = "Zmena hardwaroveho c. : ( " & $SerNo & " ) na ( " & $sUniqueID
+   $Mlog = "Zmena hardwaroveho c. : ( " & $SerNo & " ) na ( " & $sUniqueID & " )"
    WriteLog()
    $SerNo = $sUniqueID
 EndIf
 
 
 $main_GUI = GUICreate("OEE", 450, 20, 0, 0, $WS_POPUP, $WS_EX_TOPMOST)
-;~ $Label = GUICtrlCreateLabel("OEE Logovanie suborov", 0, 0, 450, 20, 0, 0x00000001)
-;~ GUICtrlSetData($Label, "OK")
-;~ GUISetState(@SW_SHOW)
+;$Label = GUICtrlCreateLabel("OEE Logovanie suborov", 0, 0, 450, 20, 0, 0x00000001)
+;GUICtrlSetData($Label, "OK")
+;GUISetState(@SW_SHOW)
 
 
 
@@ -135,27 +150,6 @@ While 1
 
 WEnd
 
-; Hardvare()nedokoncene
-; Status: beta
-; Start : 0.1.30.15
-; Zmena : 0.1.30.15
-; Popis: Ziskanie HardwareNo a Updatovanie na servery
-;~ Func HWupdate($sn,)
-;	if  $SerNo <> $sUniqueID Then
-;		IniWrite($FINI,"HW","serialnr",$sUniqueID) ; Zapisanie Noveho serioveho cisla
-;		If $Multi == 0 Then
-;
-;			IniWrite($FINI,"HW","serialnr",$sUniqueID) ; Zapisanie Noveho serioveho cisla
-;		Else
-;
-;		EndIf
-;
-;
-;	Else
-;		$HWOk = True
-;	EndIf
-;	$SerNo = $sUniqueID
-;~ EndFunc   ;==>HWupdate
 
 
 ; SetTime()
@@ -191,7 +185,7 @@ Func Pripoj()
       $Connect[1] = _MySQL_Init()
       Local $Setting1 = $Setting[1][0]
       Local $ConServer = _MySQL_Real_Connect($Connect[1], $Setting1[1][0], $Setting1[1][1], $Setting1[1][2], $Setting1[1][3])
-;~       ConsoleWrite(@CRLF & "connect  :" & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
+      ;~       ConsoleWrite(@CRLF & "connect  :" & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
       If $ConServer = 0 Then
          $Mlog = "MySQL pripojenie neuspesne"
          $Chyba = True
@@ -211,7 +205,7 @@ Func Pripoj()
          ;_ArrayDisplay($setting1,"Settingov")
          ;;;;;;;;;;;;;_MySQL_Real_Connect("Pripojenie=$Connect[$c]","IP Servra","uzivatel","Heslo","databaza");;;;;;;;;;;;;;;;;;;;;;
          Local $ConServer = _MySQL_Real_Connect($Connect[$c], $Setting1[1][0], $Setting1[1][1], $Setting1[1][2], $Setting1[1][3])
-;~          ConsoleWrite(@CRLF & "connect  :  " & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
+        ;~ ConsoleWrite(@CRLF & "connect  :  " & $Setting1[1][0] & "   " & $Setting1[1][1] & "   " & $Setting1[1][2] & "   " & $Setting1[1][3])
          If $ConServer = 0 Then
             $Mlog = "MySQL pripojenie neuspesne"
             $Chyba = True
@@ -274,7 +268,7 @@ EndFunc   ;==>Subor
 ; Zmena : 0.1.30.22
 ; Popis: Send data to Mysql
 Func SendData()
-;~    _ArrayDisplay($aRetArray, "Edo")
+   ;~    _ArrayDisplay($aRetArray, "Edo")
    $b = 0
    If $Setting1 == 0 Then $b = 1 ; osetrenie nenajdeneho id
    While $b == 0
@@ -310,7 +304,6 @@ Func SendData()
             $LastE = $AEror
             IniWrite($FINI, "SETTING", "LaastEror", $LastE) ; Zapisanie poslednej chyby do ini Aby bol zabezpeceny reset chyby pri restarte stroja
          EndIf
-
          ; Nedokoncene posielanie chyb na server
 
 
@@ -319,8 +312,8 @@ Func SendData()
          If $Chyba1 <> "" Then ; Ak je chyba
             $Mlog = "Data Error: " & $Chyba1
             ConsoleWrite(@CRLF & "Stanica" & ($Stanica + 1) & "Data Error: " & $Chyba1) ; Zapisanie Chyby zo servera
-            $Spoj2 = False ; Spoj2 false aby dalej neposielalo data
-;~             GUISetState(@SW_SHOW) ; Zobrazenie GUI
+            $Spoj2 = False ; Spoj2 = false aby dalej neposielalo data
+            ;~ GUISetState(@SW_SHOW) ; Zobrazenie GUI
             Return ; vyhodenie z funkcie aby sa nezmazal subor
          EndIf
       Next
@@ -330,9 +323,7 @@ Func SendData()
          ConsoleWrite(@CRLF & "mazanie suboru OEE.TXT")
       EndIf
       $b = 1
-
    WEnd
-
 EndFunc   ;==>SendData
 
 
@@ -404,7 +395,7 @@ Func NastavenieServra()
       _MySQL_Close($MysqlConn) ;Close Connection on server
 
       ; treba poriesit nastavenia z ostatnych nastaveni ako ip domenove meno atd...
-;~       _ArrayDisplay($Setting, "")
+      ;~  _ArrayDisplay($Setting, "")
 
       If $Setting[1][0] == 0 Or $Setting[2][0] == 0 Or $Setting[3][0] == 0 Or $Setting[4][0] == 0 Then
          $Spoj = True
@@ -432,9 +423,9 @@ Func TCSetting()
    ;   $TCMAC =
    $TCFV = FileGetVersion(@ScriptFullPath) ; Ziskanie verzie suboru zo samotneho suboru
 
-;~    $Mlog = "verzia suboru : " & $TCFV
+   ;~ $Mlog = "verzia suboru : " & $TCFV
 
-;~    ConsoleWrite(@CRLF & @ScriptFullPath)
+   ;~ ConsoleWrite(@CRLF & @ScriptFullPath)
 
 EndFunc   ;==>TCSetting
 
@@ -452,7 +443,7 @@ Func WriteLog()
       Local $cas = _Date_Time_SystemTimeToDateTimeStr($Cas1)
       $cas = StringReplace($cas, "/", "_")
       $cas = StringReplace($cas, ":", "_")
-;~       ConsoleWrite(@CRLF & $LogSize)
+      ;~ ConsoleWrite(@CRLF & $LogSize)
       If $LogSize >= "1000000" Then
          ConsoleWrite(@CRLF & $LogSize & $DataDir & $cas & "Archive.log")
          FileMove($LogFile, $DirBack & "Error_" & $cas & ".log", $FC_OVERWRITE & $FC_CREATEPATH)
@@ -466,23 +457,51 @@ Func WriteLog()
    EndIf
 EndFunc   ;==>WriteLog
 
-; GetMAC()
+; GetMAC2()
 ; Status: uvolnena
 ; Start : 0.1.30.15
 ; Zmena : 0.1.30.16
 ; Popis: Ziskanie Unikatneho cisla z macAdresy prvej sietovej karty
-Func GetMAC()
+Func GetMAC2()
    $FMAC = "C:\Data\Mac.txt"
    RunWait(@ComSpec & ' /c getmac > "C:\Data\Mac.txt"')
    Local $hFileOpen = FileOpen("C:\Data\Mac.txt", $FO_READ)
-;~ 	If $hFileOpen = -1 Then
-;~ 		MsgBox($MB_SYSTEMMODAL, "", "An error occurred when reading the file.")
-;~ 		Return False
-;~ 	EndIf
+   ;~ 	If $hFileOpen = -1 Then
+   ;~ 		MsgBox($MB_SYSTEMMODAL, "", "An error occurred when reading the file.")
+   ;~ 		Return False
+   ;~ 	EndIf
    Local $sFileRead = FileReadLine($hFileOpen, 4) ; Nacitanie Obsahu suboru.Subor pouziva popisovac funkcie FileOpen.
    $sFileRead = StringReplace(StringLeft($sFileRead, 17), "-", "") ; orezanie a nahradenie pomlciek
    FileClose($hFileOpen) ; Zavrieť popisovača vráteneho aplikaciou FileOpen. Close the handle returned by FileOpen.
    FileDelete($FMAC) ; Vymazanie docasneho suboru.
-   $sUniqueID = $sFileRead
+   Return $sFileRead
+
+EndFunc   ;==>GetMAC2
+
+; GetMAC()
+; Status: uvolnena
+; Start : 0.1.30.23
+; Zmena : 0.1.30.23
+; Popis: Ziskanie Unikatneho cisla z macAdresy podla ip nastavenej v ini subore
+Func GetMAC()
+
+   $_MACsIP = $IPip
+   Local $_MAC, $_MACSize
+   Local $_MACi, $_MACs, $_MACr, $_MACiIP
+   $_MAC = DllStructCreate("byte[6]")
+   $_MACSize = DllStructCreate("int")
+   DllStructSetData($_MACSize, 1, 6)
+   $_MACr = DllCall("Ws2_32.dll", "int", "inet_addr", "str", $_MACsIP)
+   $_MACiIP = $_MACr[0]
+   $_MACr = DllCall("iphlpapi.dll", "int", "SendARP", "int", $_MACiIP, "int", 0, "ptr", DllStructGetPtr($_MAC), "ptr", DllStructGetPtr($_MACSize))
+   $_MACs = ""
+   For $_MACi = 0 To 5
+      If $_MACi Then $_MACs = $_MACs
+      $_MACs = $_MACs & Hex(DllStructGetData($_MAC, 1, $_MACi + 1), 2)
+   Next
+   DllClose($_MAC)
+   DllClose($_MACSize)
+
+   Return $_MACs
 
 EndFunc   ;==>GetMAC
