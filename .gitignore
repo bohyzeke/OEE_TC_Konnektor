@@ -5,9 +5,3 @@
 ## Project files ######
 BackUp
 Pomoc
-.gcc-flags.json
-sonoff/user_config_override.h
-build
-
-## Visual Studio Code specific ######
-.vscode
