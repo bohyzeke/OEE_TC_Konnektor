@@ -1,1 +1,3 @@
 # OEE_TC_Konnektor
+
+TC-Konektor  slúži na pripojenie a posielanie výrobných dát do systemu Automation plus. Program PLC je napísaný pre TwinCAT2 od verzie „build 1544“. Tento PLC program vytvára a ukladá  súbor  s dátami pre skript, ktorý následne posiela údaje na databázový server.  Spojenie z databázovým serverom zabezpečuje skript vytvorený v programovacom prostredí Autoit . Jeho úlohou je posielať dáta zo zdrojového súboru „OEE.txt“ na Databázový server. Všetky potrebné nastavenia pre spojenie zo serverom sa nachádzajú v konfiguračnom súbore. Ďalšia neoddeliteľná súčasť celého systému sa nachádza už priamo na servery. To sú už samotné databázy a tabuľky pre nastavenie TC-konektora . 
